@@ -88,6 +88,6 @@ def run_automation():
 
     print(f"\n[DONE] Check: insta_report.txt")
 
-# ৪. এটি ঠিকমতো খেয়াল করুন (ডাবল আন্ডারস্কোর)
+# ৪. এখানে ভুলেও একটা আন্ডারস্কোর দিবেন না, ২টা করে দিবেন (__) 
 if __name__ == "__main__":
     run_automation()
