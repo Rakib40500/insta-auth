@@ -4,6 +4,7 @@ import os
 import time
 import hashlib
 import requests
+from datetime import datetime
 
 def get_hwid():
     try:
@@ -17,24 +18,41 @@ def check_permission():
     hwid = get_hwid()
     print("\n" + "="*46 + "\n======= RAKIB INSTA AUTOMATION =======\n" + "="*46)
     print(f"[*] YOUR DEVICE ID: {hwid}\n" + "-" * 46)
+    
     saved_key = ""
     if os.path.exists(KEY_FILE):
         with open(KEY_FILE, "r") as f: saved_key = f.read().strip()
+    
     try:
         url = "https://raw.githubusercontent.com/Rakib40500/insta-auth/refs/heads/main/allow.txt"
         res = requests.get(url).text
-        auth = {}
+        auth_data = {}
         for line in res.splitlines():
             if ":" in line:
-                uid, ukey = line.split(":")
-                auth[uid.strip()] = ukey.strip()
+                parts = line.split(":")
+                if len(parts) >= 3:
+                    uid, ukey, udate = parts[0].strip(), parts[1].strip(), parts[2].strip()
+                    auth_data[uid] = {"key": ukey, "expiry": udate}
     except: return False
-    if hwid in auth:
-        if saved_key == auth[hwid]: return True
+
+    if hwid in auth_data:
+        # মেয়াদ শেষ কি না চেক করা
+        expiry_date = datetime.strptime(auth_data[hwid]["expiry"], "%Y-%m-%d")
+        if datetime.now() > expiry_date:
+            print(f"[!] Access Expired on: {auth_data[hwid]['expiry']}")
+            print("[*] Contact Rakib to renew.")
+            return False
+
+        if saved_key == auth_data[hwid]["key"]:
+            print(f"[✔] License Valid Until: {auth_data[hwid]['expiry']}")
+            return True
+        
         key = input("[?] ENTER LICENSE KEY: ")
-        if key == auth[hwid]:
+        if key == auth_data[hwid]["key"]:
             with open(KEY_FILE, "w") as f: f.write(key)
             return True
+    
+    print("[!] Device not registered or Access Denied!")
     return False
 
 def process_accounts():
@@ -56,17 +74,14 @@ def process_accounts():
         try:
             parts = acc.split()
             if len(parts) < 3: continue
-            
-            user = parts[0]
-            pw = parts[1]
+            user, pw = parts[0], parts[1]
             fa_key = "".join(parts[2:]).replace(" ", "").upper()
             
             print(f"\n[*] Logging in: {user}")
             try:
                 L.login(user, pw)
             except instaloader.TwoFactorAuthRequiredException:
-                totp = pyotp.TOTP(fa_key)
-                code = totp.now()
+                code = pyotp.TOTP(fa_key).now()
                 print(f"[+] 2FA Code: {code}")
                 L.two_factor_login(code)
             
@@ -77,16 +92,11 @@ def process_accounts():
             print(f"[SUCCESS] {user} cookies extracted.")
         except Exception:
             print(f"[FAILED] {user}: Check Pass/2FA Key!")
-        
         time.sleep(4)
-    print("\n[!] Batch complete. Ready for next accounts...")
+    print("\n[!] Batch complete.")
 
 def main():
-    if not check_permission():
-        print("[!] Access Denied!")
-        return
-    
-    # এই লুপটি অটোমেটিক কাজ চালিয়ে যাবে
+    if not check_permission(): return
     while True:
         process_accounts()
         print("\n" + "="*40)
