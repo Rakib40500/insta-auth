@@ -11,19 +11,15 @@ def get_hwid():
         return hashlib.md5(id_str.encode()).hexdigest()[:10].upper()
     except: return "UNKNOWN_ID"
 
-# লাইসেন্স কী একবার সেভ করে রাখার সিস্টেম
 KEY_FILE = "/data/data/com.termux/files/home/.rakib_key"
 
 def check_permission():
     hwid = get_hwid()
     print("\n" + "="*46 + "\n======= RAKIB INSTA AUTOMATION =======\n" + "="*46)
     print(f"[*] YOUR DEVICE ID: {hwid}\n" + "-" * 46)
-
-    # আগে থেকে কী সেভ করা আছে কি না চেক
     saved_key = ""
     if os.path.exists(KEY_FILE):
         with open(KEY_FILE, "r") as f: saved_key = f.read().strip()
-
     try:
         url = "https://raw.githubusercontent.com/Rakib40500/insta-auth/refs/heads/main/allow.txt"
         res = requests.get(url).text
@@ -33,20 +29,16 @@ def check_permission():
                 uid, ukey = line.split(":")
                 auth[uid.strip()] = ukey.strip()
     except: return False
-
     if hwid in auth:
         if saved_key == auth[hwid]: return True
-        
-        # নতুন করে কী চাওয়া
         key = input("[?] ENTER LICENSE KEY: ")
         if key == auth[hwid]:
-            with open(KEY_FILE, "w") as f: f.write(key) # কী সেভ করে রাখা
+            with open(KEY_FILE, "w") as f: f.write(key)
             return True
     return False
 
 def run_automation():
     if not check_permission(): print("[!] Access Denied!"); return
-    
     print("\nPaste accounts (User Pass 2FA) - Example: user pass key")
     print("Press Enter twice to start...")
     accounts = []
@@ -62,9 +54,15 @@ def run_automation():
         L = instaloader.Instaloader()
         L.context.user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15"
         try:
+            # এখানে স্পেস বড় হোক বা ছোট, সব ঠিক করে নিবে
             parts = acc.split()
-            if len(parts) < 3: continue
-            user, pw = parts[0], parts[1]
+            if len(parts) < 3:
+                print(f"[!] Invalid Format: {acc}")
+                continue
+            
+            user = parts[0] # প্রথম শব্দ ইউজারনেম
+            pw = parts[1]   # দ্বিতীয় শব্দ পাসওয়ার্ড
+            # বাকি সব স্পেস রিমুভ করে ২এফএ কী বানানো হচ্ছে
             fa_key = "".join(parts[2:]).replace(" ", "").upper()
             
             print(f"\n[*] Working on: {user}")
@@ -73,7 +71,7 @@ def run_automation():
             except instaloader.TwoFactorAuthRequiredException:
                 totp = pyotp.TOTP(fa_key)
                 code = totp.now()
-                print(f"[+] Auto 2FA Code: {code}")
+                print(f"[+] Auto 2FA Code Generated: {code}")
                 L.two_factor_login(code)
             
             cookie = L.context._session.cookies.get_dict()
@@ -82,12 +80,12 @@ def run_automation():
                 f.write(f"{user}|{pw}|{cookie_str}\n")
             print(f"[SUCCESS] {user} saved to report.")
         except Exception as e:
-            print(f"[FAILED] {user}: Check credentials or 2FA key!")
+            print(f"[FAILED] {user}: Login Error/2FA Invalid!")
         
         print("-" * 30)
-        time.sleep(5) # অটোমেটিক পরের অ্যাকাউন্টে যাওয়ার বিরতি
+        time.sleep(5) # অটোমেটিক পরের অ্যাকাউন্টে যাওয়ার জন্য
     
-    print(f"\n[DONE] All accounts processed. Check: insta_report.txt")
+    print(f"\n[DONE] Results saved in: insta_report.txt")
 
 if __name__ == "__main__":
     run_automation()
