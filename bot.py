@@ -5,7 +5,7 @@ import time
 import hashlib
 import requests
 
-# ১. ডিভাইস আইডি জেনারেট করা
+# ১. ইউনিক ডিভাইস আইডি জেনারেট করা
 def get_hwid():
     try:
         id_str = os.getlogin() + "RAKIB_SECURE_2026"
@@ -13,7 +13,7 @@ def get_hwid():
     except:
         return "UNKNOWN_ID"
 
-# ২. পারমিশন চেক করা
+# ২. পারমিশন এবং কী ভেরিফিকেশন
 def check_permission():
     hwid = get_hwid()
     print("\n" + "="*46)
@@ -31,26 +31,22 @@ def check_permission():
                 u_id, u_key = line.split(":")
                 authorized_users[u_id.strip()] = u_key.strip()
     except Exception:
-        print("[ERROR] Internet connection required!")
+        print("[!] Internet Error! Check connection.")
         return False
 
     if hwid in authorized_users:
         key = input("[?] ENTER LICENSE KEY: ")
         if key == authorized_users[hwid]:
             print("[SUCCESS] Access Granted!")
-            time.sleep(1)
             return True
         else:
-            print("[ERROR] Wrong Key!")
-            return False
+            print("[ERROR] Wrong Key!"); return False
     else:
-        print("[ERROR] Device not registered!")
-        return False
+        print("[ERROR] Device not registered!"); return False
 
-# ৩. মেইন অটোমেশন
+# ৩. মেইন অটোমেশন (উন্নত ২এফএ সিস্টেমসহ)
 def run_automation():
-    if not check_permission():
-        return
+    if not check_permission(): return
 
     print("\nPaste accounts (User Pass 2FA) then press Enter twice:")
     accounts = []
@@ -59,35 +55,52 @@ def run_automation():
             line = input()
             if not line.strip(): break
             accounts.append(line.strip())
-        except EOFError:
-            break
+        except EOFError: break
 
     output_path = "/sdcard/insta_report.txt"
     for acc in accounts:
         L = instaloader.Instaloader()
+        # ব্রাউজারের মতো ইউজার এজেন্ট সেট করা যাতে এরর কম আসে
+        L.context.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        
         try:
             parts = acc.split()
             if len(parts) < 3: continue
             username, password = parts[0], parts[1]
-            two_fa_key = "".join(parts[2:]).replace(" ", "")
+            # ২এফএ কী থেকে সব স্পেস এবং ফালতু ক্যারেক্টার সরানো
+            two_fa_key = "".join(parts[2:]).replace(" ", "").upper()
 
             print(f"\n[*] Working on: {username}")
+            
             try:
                 L.login(username, password)
             except instaloader.TwoFactorAuthRequiredException:
-                L.two_factor_login(lambda: pyotp.TOTP(two_fa_key).now())
+                # ২এফএ কোড জেনারেট করা (TOTP)
+                totp = pyotp.TOTP(two_fa_key)
+                current_code = totp.now()
+                print(f"[+] 2FA Code Generated: {current_code}")
+                L.two_factor_login(current_code)
 
+            # লগইন সফল হলে কুকি সেভ করা
             cookies = L.context._session.cookies.get_dict()
             cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
             with open(output_path, "a") as f:
                 f.write(f"{username}|{password}|{cookie_str}\n")
             print(f"[SUCCESS] {username} cookies saved.")
-            time.sleep(2)
+            
         except Exception as e:
-            print(f"[FAILED] {username}: {str(e)}")
+            # যদি ২এফএ ভুল হয় বা অন্য কোনো সমস্যা হয়
+            error_msg = str(e)
+            if "checkpoint" in error_msg.lower():
+                print(f"[FAILED] {username}: Security Checkpoint!")
+            elif "2fa" in error_msg.lower() or "code" in error_msg.lower():
+                print(f"[FAILED] {username}: Invalid 2FA key or code!")
+            else:
+                print(f"[FAILED] {username}: {error_msg}")
+        
+        time.sleep(3) # সার্ভার সেফটির জন্য বিরতি
 
-    print(f"\n[DONE] Check: insta_report.txt")
+    print(f"\n[DONE] Results saved in: insta_report.txt")
 
-# ৪. এখানে ভুলেও একটা আন্ডারস্কোর দিবেন না, ২টা করে দিবেন (__) 
 if __name__ == "__main__":
     run_automation()
