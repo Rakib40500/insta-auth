@@ -37,10 +37,8 @@ def check_permission():
             return True
     return False
 
-def run_automation():
-    if not check_permission(): print("[!] Access Denied!"); return
-    print("\nPaste accounts (User Pass 2FA) - Example: user pass key")
-    print("Press Enter twice to start...")
+def process_accounts():
+    print("\n[>] Paste accounts (User Pass 2FA) & Press Enter twice:")
     accounts = []
     while True:
         try:
@@ -49,43 +47,49 @@ def run_automation():
             accounts.append(line.strip())
         except: break
 
+    if not accounts: return
+
     output_path = "/sdcard/insta_report.txt"
     for acc in accounts:
         L = instaloader.Instaloader()
         L.context.user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15"
         try:
-            # এখানে স্পেস বড় হোক বা ছোট, সব ঠিক করে নিবে
             parts = acc.split()
-            if len(parts) < 3:
-                print(f"[!] Invalid Format: {acc}")
-                continue
+            if len(parts) < 3: continue
             
-            user = parts[0] # প্রথম শব্দ ইউজারনেম
-            pw = parts[1]   # দ্বিতীয় শব্দ পাসওয়ার্ড
-            # বাকি সব স্পেস রিমুভ করে ২এফএ কী বানানো হচ্ছে
+            user = parts[0]
+            pw = parts[1]
             fa_key = "".join(parts[2:]).replace(" ", "").upper()
             
-            print(f"\n[*] Working on: {user}")
+            print(f"\n[*] Logging in: {user}")
             try:
                 L.login(user, pw)
             except instaloader.TwoFactorAuthRequiredException:
                 totp = pyotp.TOTP(fa_key)
                 code = totp.now()
-                print(f"[+] Auto 2FA Code Generated: {code}")
+                print(f"[+] 2FA Code: {code}")
                 L.two_factor_login(code)
             
             cookie = L.context._session.cookies.get_dict()
             cookie_str = "; ".join([f"{k}={v}" for k, v in cookie.items()])
             with open(output_path, "a") as f:
                 f.write(f"{user}|{pw}|{cookie_str}\n")
-            print(f"[SUCCESS] {user} saved to report.")
-        except Exception as e:
-            print(f"[FAILED] {user}: Login Error/2FA Invalid!")
+            print(f"[SUCCESS] {user} cookies extracted.")
+        except Exception:
+            print(f"[FAILED] {user}: Check Pass/2FA Key!")
         
-        print("-" * 30)
-        time.sleep(5) # অটোমেটিক পরের অ্যাকাউন্টে যাওয়ার জন্য
+        time.sleep(4)
+    print("\n[!] Batch complete. Ready for next accounts...")
+
+def main():
+    if not check_permission():
+        print("[!] Access Denied!")
+        return
     
-    print(f"\n[DONE] Results saved in: insta_report.txt")
+    # এই লুপটি অটোমেটিক কাজ চালিয়ে যাবে
+    while True:
+        process_accounts()
+        print("\n" + "="*40)
 
 if __name__ == "__main__":
-    run_automation()
+    main()
